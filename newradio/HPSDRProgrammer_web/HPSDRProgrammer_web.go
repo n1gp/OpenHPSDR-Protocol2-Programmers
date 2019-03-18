@@ -7,6 +7,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -25,7 +26,8 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	"github.com/TAPR/OpenHPSDR-Protocol2-Programmers/newopenhpsdr"
+	//"oak.snr.missouri.edu/daveradio/newopenhpsdr"
+	"newopenhpsdr"
 )
 
 // Server address and port
@@ -34,15 +36,15 @@ var srvaddress string
 const srvport string = "8228"
 
 // Constants to define the program state
-const version string = "0.2.8"
+const version string = "0.2.9"
 const protocol string = ">1.7"
-const update string = "2016-9-17"
+const update string = "2019-3-14"
 
 //  String to define the program banner in each web window
 const banner string = `
 <div id="header" align="left" style="background-color:Darkblue;border:2px solid; border-radius:8px; ">
 <b align="left" width="90%" style="margin-left:45px; color:white; font-size:38px ">HPSDR Programmer</b>
-<p style="margin-left:45px; color:white; font-size:12 ">By Dave, KV&#216S - Version {{.Version}}, Protocol {{.Protocol}} - Last Updated {{.Update}} -  <a style="color:white; font-size:12px" href="http://openhpsdr.org">openhpsdr.org</a> </p>
+<p style="margin-left:45px; color:white; font-size:12 ">By Dave, KV&#216S (N1GP TEST) - Version {{.Version}}, Protocol {{.Protocol}} - Last Updated {{.Update}} -  <a style="color:white; font-size:12px" href="http://openhpsdr.org">openhpsdr.org</a> </p>
 </div>
 `
 
@@ -1122,6 +1124,8 @@ func counthandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+var chk = uint16(0)
+
 // Upload the selected file to a common place for use by the programmer
 func uploadhandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Served Upload Interface page.")
@@ -1204,6 +1208,36 @@ func uploadhandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("Size rbf in memory:", ((fi.Size()+255)/256)*256)
 	log.Println("           Packets:", packets)
 
+	f.Seek(0, 0)
+	fq := bufio.NewReader(f)
+	buf := make([]byte, 256)
+	for {
+		// read a chunk
+		n, err := fq.Read(buf)
+		if err != nil && err != io.EOF {
+			log.Fatal(err)
+		}
+
+		// No more data in file
+		if n == 0 {
+			break
+		}
+
+		for i := 0; i < n; i++ {
+			chk += uint16(buf[i])
+		}
+
+		// Pad out the data to complete the packet
+		if n < 256 {
+			for i := n; i < 256; i++ {
+				chk += uint16(0xFF)
+			}
+			n = 256
+		}
+	}
+	hx := fmt.Sprintf("%04x", chk)
+	log.Println("          Checksum:", hx)
+
 	fmt.Fprintf(w, "<h1>Firmware File Information</h1>\n")
 	fmt.Fprintf(w, "<table>\n<tr>\n")
 	fmt.Fprintf(w, "<td align=\"right\">\n")
@@ -1225,6 +1259,11 @@ func uploadhandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "<b>Packets:</b>")
 	fmt.Fprintf(w, "</td><td>")
 	fmt.Fprintf(w, "%d", packets)
+	fmt.Fprintf(w, "</td></tr>")
+	fmt.Fprintf(w, "<td align=\"right\">\n")
+	fmt.Fprintf(w, "<b>Checksum:</b>")
+	fmt.Fprintf(w, "</td><td>")
+	fmt.Fprintf(w, "%s", hx)
 	fmt.Fprintf(w, "</td></tr>")
 	fmt.Fprintf(w, "</table><br/><br/>\n")
 	fmt.Fprintf(w, "<form action=\"/file/\">")
@@ -1266,7 +1305,15 @@ func sensorhandler(ws *websocket.Conn) {
 			} else if mnum == 1003 {
 				msge = fmt.Sprintf("Erase Done, Programming Started 0 Seconds")
 			} else if mnum == 1004 {
-				msge = fmt.Sprintf("Erase Done, Programmming Done")
+				csum := newopenhpsdr.Checksum()
+				// No checksum in SDR reply (send_more)
+				if chk == 0 {
+					msge = fmt.Sprintf("Erase Done, Programming Done")
+				} else if csum == chk {
+					msge = fmt.Sprintf("Erase Done, Programming Done Checksums MATCH OK FILE:%x SDR:%x", chk, csum)
+				} else {
+					msge = fmt.Sprintf("Erase Done, Programming Done Checksums MISMATCH FILE:%x SDR:%x", chk, csum)
+				}
 			}
 		default:
 			if erasing {

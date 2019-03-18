@@ -402,13 +402,13 @@ func Discover(addrStr string, bcastStr string, debug string) (strs []Hpsdrboard,
 	} else if c[11] == 1 {
 		str.Board = "HERMES"
 	} else if c[11] == 2 {
-		str.Board = "HERMES"
+		str.Board = "HERMES2"
 	} else if c[11] == 3 {
 		str.Board = "ANGELIA"
 	} else if c[11] == 4 {
 		str.Board = "ORION"
-	} else if c[11] == 4 {
-		str.Board = "ANAN-10E"
+	} else if c[11] == 5 {
+		str.Board = "ORION2"
 	} else if c[11] == 6 {
 		str.Board = "HERMES-LITE"
 	} else {
@@ -658,6 +658,12 @@ func Lapstime(lps *Erasemessage) {
 	}
 }
 
+var nchk = uint16(0)
+// Send the Program packet to an interface.
+func Checksum() (uint16){
+	return nchk
+}
+
 // Send the Program packet to an interface.
 func Program(addrStr string, str Hpsdrboard, input string, debug string) (er error) {
 	log.Printf("Program: %s -> %s\n", addrStr, str.Baddress)
@@ -686,14 +692,42 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 	log.Println("    Found rbf file:", input)
 	log.Println("     Size rbf file:", fi.Size())
 	log.Println("Size rbf in memory:", ((fi.Size()+255)/256)*256)
-	log.Println("           Packets:", packets)
-	log.Println(" ")
 
 	r := bufio.NewReader(f)
 
 	l, err := Commlink(addrStr)
 
 	buf := make([]byte, 256)
+	fchk := uint16(0)
+	for {
+		// read a chunk
+		n, err := r.Read(buf)
+		if err != nil && err != io.EOF {
+			log.Fatal(err)
+		}
+
+		// No more data in file
+		if n == 0 {
+			f.Seek(0, 0)
+			break
+		}
+
+		for i := 0; i < n; i++ {
+			fchk += uint16(buf[i])
+		}
+
+		// Pad out the data to complete the packet
+		if n < 256 {
+			for i := n; i < 256; i++ {
+				fchk += uint16(0xFF)
+			}
+			n = 256
+		}
+	}
+	log.Println("           Packets:", packets)
+	log.Println("          Checksum:", fchk)
+	log.Println(" ")
+
 	ipk := uint32(0)
 	for {
 		// read a chunk
@@ -704,6 +738,7 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 
 		// No more data in file
 		if n == 0 {
+			log.Printf("             checksum: %x\n", nchk)
 			log.Printf("\n     Program complete: \n\n")
 			break
 		}
@@ -743,9 +778,12 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 				} else {
 					log.Printf("     Received data: sent %d = rec %d, %v bytes from %v", sennum, recnum, n, ad)
 				}
+				// get the final checksum
+				nchk = binary.BigEndian.Uint16(c[13:15])
 				break
 			} else if binary.BigEndian.Uint32(c[0:4]) == ipk {
 				log.Printf("     Program complete: \n")
+				log.Printf("             checksum: %x\n", nchk)
 				l.Close()
 				return nil
 			} else {
