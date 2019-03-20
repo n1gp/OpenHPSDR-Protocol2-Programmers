@@ -1310,9 +1310,9 @@ func sensorhandler(ws *websocket.Conn) {
 				if chk == 0 {
 					msge = fmt.Sprintf("Erase Done, Programming Done")
 				} else if csum == chk {
-					msge = fmt.Sprintf("Erase Done, Programming Done Checksums MATCH OK FILE:%x SDR:%x", chk, csum)
+					msge = fmt.Sprintf("Erase Done, Programming Done Checksums MATCH OK FILE:%x SDR:%04x", chk, csum)
 				} else {
-					msge = fmt.Sprintf("Erase Done, Programming Done Checksums MISMATCH FILE:%x SDR:%x", chk, csum)
+					msge = fmt.Sprintf("Erase Done, Programming Done Checksums MISMATCH FILE:%x SDR:%04x", chk, csum)
 				}
 			}
 		default:

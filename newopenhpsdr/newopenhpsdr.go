@@ -659,7 +659,6 @@ func Lapstime(lps *Erasemessage) {
 }
 
 var nchk = uint16(0)
-// Send the Program packet to an interface.
 func Checksum() (uint16){
 	return nchk
 }
@@ -725,7 +724,7 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 		}
 	}
 	log.Println("           Packets:", packets)
-	log.Println("          Checksum:", fchk)
+	log.Println("          Checksum: %04x", fchk)
 	log.Println(" ")
 
 	ipk := uint32(0)
@@ -738,7 +737,7 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 
 		// No more data in file
 		if n == 0 {
-			log.Printf("             checksum: %x\n", nchk)
+			log.Printf("             checksum: %04x\n", nchk)
 			log.Printf("\n     Program complete: \n\n")
 			break
 		}
@@ -783,7 +782,7 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 				break
 			} else if binary.BigEndian.Uint32(c[0:4]) == ipk {
 				log.Printf("     Program complete: \n")
-				log.Printf("             checksum: %x\n", nchk)
+				log.Printf("             checksum: %04x\n", nchk)
 				l.Close()
 				return nil
 			} else {
