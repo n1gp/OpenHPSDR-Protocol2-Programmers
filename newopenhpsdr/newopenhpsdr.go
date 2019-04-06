@@ -724,7 +724,7 @@ func Program(addrStr string, str Hpsdrboard, input string, debug string) (er err
 		}
 	}
 	log.Println("           Packets:", packets)
-	log.Println("          Checksum: %04x", fchk)
+	log.Printf("           Checksum: %04x\n", fchk)
 	log.Println(" ")
 
 	ipk := uint32(0)

@@ -1211,7 +1211,7 @@ func uploadhandler(w http.ResponseWriter, r *http.Request) {
 	f.Seek(0, 0)
 	fq := bufio.NewReader(f)
 	buf := make([]byte, 256)
-	chk = 0;
+	chk = 0
 	for {
 		// read a chunk
 		n, err := fq.Read(buf)
